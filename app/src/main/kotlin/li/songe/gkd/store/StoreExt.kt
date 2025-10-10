@@ -45,6 +45,14 @@ fun initStore() = appScope.launchTry(Dispatchers.IO) {
     actionCountFlow.value
     blockMatchAppListFlow.value
     blockA11yAppListFlow.value
+    
+    // 初始化ADB设置
+    try {
+        li.songe.gkd.adb.adbSettingsFlow.value
+        li.songe.gkd.adb.adbAutomationHistoryFlow.value
+    } catch (e: Exception) {
+        // ADB设置初始化失败不影响主应用
+    }
 }
 
 fun switchStoreEnableMatch() {

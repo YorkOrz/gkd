@@ -64,7 +64,7 @@ android {
         minSdk = rootProject.ext["android.minSdk"] as Int
         targetSdk = rootProject.ext["android.targetSdk"] as Int
 
-        applicationId = "li.songe.gkd"
+        applicationId = "li.songe.gkd.custom"
         versionCode = 65
         versionName = "1.10.4"
 
@@ -90,11 +90,15 @@ android {
         aidl = true
     }
 
-    val gkdSigningConfig = signingConfigs.create("gkd") {
-        storeFile = file(project.properties["GKD_STORE_FILE"] as String)
-        storePassword = project.properties["GKD_STORE_PASSWORD"].toString()
-        keyAlias = project.properties["GKD_KEY_ALIAS"].toString()
-        keyPassword = project.properties["GKD_KEY_PASSWORD"].toString()
+    val gkdSigningConfig = if (project.hasProperty("GKD_STORE_FILE")) {
+        signingConfigs.create("gkd") {
+            storeFile = file(project.properties["GKD_STORE_FILE"].toString())
+            storePassword = project.properties["GKD_STORE_PASSWORD"].toString()
+            keyAlias = project.properties["GKD_KEY_ALIAS"].toString()
+            keyPassword = project.properties["GKD_KEY_PASSWORD"].toString()
+        }
+    } else {
+        null
     }
 
     val playSigningConfig = if (project.hasProperty("PLAY_STORE_FILE")) {
@@ -124,7 +128,9 @@ android {
             )
         }
         debug {
-            signingConfig = gkdSigningConfig
+            if (gkdSigningConfig != null) {
+                signingConfig = gkdSigningConfig
+            }
             applicationIdSuffix = ".debug"
             debugSuffixPairList.onEach { (key, value) ->
                 resValue("string", key, "$value-debug")
@@ -135,7 +141,9 @@ android {
         flavorDimensions += "channel"
         create("gkd") {
             isDefault = true
-            signingConfig = gkdSigningConfig
+            if (gkdSigningConfig != null) {
+                signingConfig = gkdSigningConfig
+            }
             resValue("bool", "is_accessibility_tool", "true")
         }
         create("play") {
