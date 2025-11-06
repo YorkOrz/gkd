@@ -615,7 +615,7 @@ fun AdvancedPage() {
                         try {
                             toast("⚠️ ColorOS 15完整自动化将在3秒后启动")
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                vm.viewModelScope.launchTry {
+                                vm.viewModelScope.launchTry(silent = true) {
                                     toast("启动ColorOS 15完整自动化，请观察设备操作...")
 
                                     val autoSetup = li.songe.gkd.adb.AdbAutoSetup()

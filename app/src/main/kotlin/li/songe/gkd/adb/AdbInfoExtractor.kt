@@ -124,7 +124,20 @@ class AdbInfoExtractor {
      */
     private fun extractDirectIpPort(root: AccessibilityNodeInfo): AdbInfo? {
         return try {
-            for (selector in DeveloperRules.ipPortSelectors) {
+            val ipPortSelectors = try {
+                DeveloperRules.ipPortSelectors
+            } catch (e: ExceptionInInitializerError) {
+                LogUtils.w("AdbInfoExtractor", "DeveloperRules 初始化失败，跳过 ipPortSelectors", e)
+                emptyList()
+            } catch (e: NoClassDefFoundError) {
+                LogUtils.w("AdbInfoExtractor", "DeveloperRules 类不可用，跳过 ipPortSelectors", e)
+                emptyList()
+            } catch (e: Exception) {
+                LogUtils.w("AdbInfoExtractor", "获取 ipPortSelectors 失败", e)
+                emptyList()
+            }
+
+            for (selector in ipPortSelectors) {
                 try {
                     val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                     if (node != null) {
@@ -151,7 +164,20 @@ class AdbInfoExtractor {
             var port: Int? = null
             
             // 提取IP地址
-            for (ipSelector in DeveloperRules.ipAddressSelectors) {
+            val ipAddressSelectors = try {
+                DeveloperRules.ipAddressSelectors
+            } catch (e: ExceptionInInitializerError) {
+                LogUtils.w("AdbInfoExtractor", "DeveloperRules 初始化失败，跳过 ipAddressSelectors", e)
+                emptyList()
+            } catch (e: NoClassDefFoundError) {
+                LogUtils.w("AdbInfoExtractor", "DeveloperRules 类不可用，跳过 ipAddressSelectors", e)
+                emptyList()
+            } catch (e: Exception) {
+                LogUtils.w("AdbInfoExtractor", "获取 ipAddressSelectors 失败", e)
+                emptyList()
+            }
+
+            for (ipSelector in ipAddressSelectors) {
                 try {
                     val node = a11yContext.querySelfOrSelector(root, ipSelector, MatchOption())
                     if (node != null) {
@@ -168,7 +194,20 @@ class AdbInfoExtractor {
             }
             
             // 提取端口号
-            for (portSelector in DeveloperRules.portSelectors) {
+            val portSelectors = try {
+                DeveloperRules.portSelectors
+            } catch (e: ExceptionInInitializerError) {
+                LogUtils.w("AdbInfoExtractor", "DeveloperRules 初始化失败，跳过 portSelectors", e)
+                emptyList()
+            } catch (e: NoClassDefFoundError) {
+                LogUtils.w("AdbInfoExtractor", "DeveloperRules 类不可用，跳过 portSelectors", e)
+                emptyList()
+            } catch (e: Exception) {
+                LogUtils.w("AdbInfoExtractor", "获取 portSelectors 失败", e)
+                emptyList()
+            }
+
+            for (portSelector in portSelectors) {
                 try {
                     val node = a11yContext.querySelfOrSelector(root, portSelector, MatchOption())
                     if (node != null) {
@@ -448,9 +487,31 @@ class AdbInfoExtractor {
      */
     fun isInSettingsApp(): Boolean {
         val packageName = getCurrentPackageName()
-        return packageName != null && DeveloperRules.settingsPackageNames.any { 
-            packageName.contains(it, ignoreCase = true) 
+        if (packageName == null) return false
+        val settingsPackages = try {
+            DeveloperRules.settingsPackageNames
+        } catch (e: ExceptionInInitializerError) {
+            LogUtils.w("AdbInfoExtractor", "DeveloperRules 初始化失败，使用默认设置包名列表", e)
+            // 退化为常见设置包名，避免崩溃
+            listOf(
+                "com.android.settings",
+                "com.coloros.safecenter",
+                "com.oplus.applicationsettings",
+                "com.coloros.settings"
+            )
+        } catch (e: NoClassDefFoundError) {
+            LogUtils.w("AdbInfoExtractor", "DeveloperRules 类不可用，使用默认设置包名列表", e)
+            listOf(
+                "com.android.settings",
+                "com.coloros.safecenter",
+                "com.oplus.applicationsettings",
+                "com.coloros.settings"
+            )
+        } catch (e: Exception) {
+            LogUtils.w("AdbInfoExtractor", "获取 settingsPackageNames 失败，使用默认", e)
+            listOf("com.android.settings")
         }
+        return settingsPackages.any { packageName.contains(it, ignoreCase = true) }
     }
     
     /**

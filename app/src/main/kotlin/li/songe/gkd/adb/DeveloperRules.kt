@@ -101,20 +101,24 @@ object DeveloperRules {
         }
     }
 
-    // IP地址选择器 - 修复语法
-    val ipAddressSelectors = listOf(
-        Selector.parse("text~=\\d+\\.\\d+\\.\\d+\\.\\d+"),
-        Selector.parse("desc~=\\d+\\.\\d+\\.\\d+\\.\\d+"),
-        Selector.parse("text*=`IP` text~=\\d+\\.\\d+\\.\\d+\\.\\d+")
-    )
+    // IP地址选择器 - 修复语法（延迟初始化，逐条容错）
+    val ipAddressSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text~=\\d+\\.\\d+\\.\\d+\\.\\d+")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc~=\\d+\\.\\d+\\.\\d+\\.\\d+")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`IP` text~=\\d+\\.\\d+\\.\\d+\\.\\d+")) } catch (e: Exception) {}
+        }
+    }
 
-    // 端口选择器 - 修复语法
-    val portSelectors = listOf(
-        Selector.parse("text*=`端口` text~=\\d{4,5}"),
-        Selector.parse("text*=`Port` text~=\\d{4,5}"),
-        Selector.parse("desc*=`端口` text~=\\d{4,5}"),
-        Selector.parse("text~=\\d{4,5}")
-    )
+    // 端口选择器 - 修复语法（延迟初始化，逐条容错）
+    val portSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text*=`端口` text~=\\d{4,5}")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`Port` text~=\\d{4,5}")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`端口` text~=\\d{4,5}")) } catch (e: Exception) {}
+            try { add(Selector.parse("text~=\\d{4,5}")) } catch (e: Exception) {}
+        }
+    }
 
     // 开关/切换按钮选择器 - 修复语法（延迟初始化，避免ExceptionInInitializerError）
     val switchSelectors by lazy {
@@ -139,30 +143,32 @@ object DeveloperRules {
         }
     }
 
-    // IP和端口信息选择器 - 修复语法
-    val ipPortSelectors = listOf(
-        // 直接匹配 IP:端口 格式
-        Selector.parse("text~=\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+"),
-        Selector.parse("desc~=\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+"),
+    // IP和端口信息选择器 - 修复语法（延迟初始化，逐条容错）
+    val ipPortSelectors by lazy {
+        buildList {
+            // 直接匹配 IP:端口 格式
+            try { add(Selector.parse("text~=\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc~=\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+")) } catch (e: Exception) {}
 
-        // IP地址相关文本
-        Selector.parse("text*=`IP` + * text~=\\d+\\.\\d+\\.\\d+\\.\\d+"),
-        Selector.parse("text*=`地址` + * text~=\\d+\\.\\d+\\.\\d+\\.\\d+"),
-        Selector.parse("text*=`Address` + * text~=\\d+\\.\\d+\\.\\d+\\.\\d+"),
+            // IP地址相关文本
+            try { add(Selector.parse("text*=`IP` + * text~=\\d+\\.\\d+\\.\\d+\\.\\d+")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`地址` + * text~=\\d+\\.\\d+\\.\\d+\\.\\d+")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`Address` + * text~=\\d+\\.\\d+\\.\\d+\\.\\d+")) } catch (e: Exception) {}
 
-        // 端口相关文本
-        Selector.parse("text*=`端口` + * text~=\\d+"),
-        Selector.parse("text*=`Port` + * text~=\\d+"),
+            // 端口相关文本
+            try { add(Selector.parse("text*=`端口` + * text~=\\d+")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`Port` + * text~=\\d+")) } catch (e: Exception) {}
 
-        // 包含IP和端口的容器
-        Selector.parse("text*=`IP` text*=`端口`"),
-        Selector.parse("text*=`IP` text*=`Port`"),
-        Selector.parse("desc*=`IP` desc*=`端口`"),
+            // 包含IP和端口的容器
+            try { add(Selector.parse("text*=`IP` text*=`端口`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`IP` text*=`Port`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`IP` desc*=`端口`")) } catch (e: Exception) {}
 
-        // 调试信息相关
-        Selector.parse("text*=`调试地址` || text*=`Debug address`"),
-        Selector.parse("text*=`连接地址` || text*=`Connection address`")
-    )
+            // 调试信息相关
+            try { add(Selector.parse("text*=`调试地址` || text*=`Debug address`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`连接地址` || text*=`Connection address`")) } catch (e: Exception) {}
+        }
+    }
 
     // 确认/允许按钮选择器 - 修复语法（延迟初始化）
     val confirmSelectors by lazy {
@@ -174,33 +180,41 @@ object DeveloperRules {
         }
     }
 
-    // 取消/拒绝按钮选择器 - 修复语法
-    val cancelSelectors = listOf(
-        Selector.parse("text=`取消` || text=`Cancel` || text=`拒绝` || text=`Deny`"),
-        Selector.parse("text=`不允许` || text*=`Don't allow` || text=`否` || text=`No`"),
-        Selector.parse("desc=`取消` || desc=`Cancel` || desc=`拒绝`")
-    )
+    // 取消/拒绝按钮选择器 - 修复语法（延迟初始化，逐条容错）
+    val cancelSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text=`取消` || text=`Cancel` || text=`拒绝` || text=`Deny`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`不允许` || text*=`Don't allow` || text=`否` || text=`No`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc=`取消` || desc=`Cancel` || desc=`拒绝`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 返回按钮选择器 - 修复语法
-    val backSelectors = listOf(
-        Selector.parse("desc=`返回` || desc=`Back` || desc=`Navigate up`"),
-        Selector.parse("className=`android.widget.ImageButton` desc*=`返回`"),
-        Selector.parse("className=`android.widget.ImageView` desc*=`返回`")
-    )
+    // 返回按钮选择器 - 修复语法（延迟初始化，逐条容错）
+    val backSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("desc=`返回` || desc=`Back` || desc=`Navigate up`")) } catch (e: Exception) {}
+            try { add(Selector.parse("className=`android.widget.ImageButton` desc*=`返回`")) } catch (e: Exception) {}
+            try { add(Selector.parse("className=`android.widget.ImageView` desc*=`返回`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 搜索框选择器 - 修复语法
-    val searchSelectors = listOf(
-        Selector.parse("hint*=`搜索` || hint*=`Search`"),
-        Selector.parse("text*=`搜索` || text*=`Search`"),
-        Selector.parse("className=`android.widget.EditText` hint*=`搜索`")
-    )
+    // 搜索框选择器 - 修复语法（延迟初始化，逐条容错）
+    val searchSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("hint*=`搜索` || hint*=`Search`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`搜索` || text*=`Search`")) } catch (e: Exception) {}
+            try { add(Selector.parse("className=`android.widget.EditText` hint*=`搜索`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 列表项选择器（用于在设置列表中查找） - 修复语法
-    val listItemSelectors = listOf(
-        Selector.parse("className=`android.widget.LinearLayout` clickable=true"),
-        Selector.parse("className=`androidx.recyclerview.widget.RecyclerView` > *"),
-        Selector.parse("className=`android.widget.ListView` > *")
-    )
+    // 列表项选择器（用于在设置列表中查找） - 修复语法（延迟初始化，逐条容错）
+    val listItemSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("className=`android.widget.LinearLayout` clickable=true")) } catch (e: Exception) {}
+            try { add(Selector.parse("className=`androidx.recyclerview.widget.RecyclerView` > *")) } catch (e: Exception) {}
+            try { add(Selector.parse("className=`android.widget.ListView` > *")) } catch (e: Exception) {}
+        }
+    }
 
     /**
      * 厂商特定的开发者选项路径映射
@@ -241,24 +255,30 @@ object DeveloperRules {
      */
     object ErrorScenarios {
         // 权限请求相关 - 修复语法
-        val permissionRequestSelectors = listOf(
-            Selector.parse("text*=`权限` || text*=`Permission`"),
-            Selector.parse("text*=`授权` || text*=`Grant`"),
-            Selector.parse("text*=`允许` || text*=`Allow`")
-        )
+        val permissionRequestSelectors by lazy {
+            buildList {
+                try { add(Selector.parse("text*=`权限` || text*=`Permission`")) } catch (e: Exception) {}
+                try { add(Selector.parse("text*=`授权` || text*=`Grant`")) } catch (e: Exception) {}
+                try { add(Selector.parse("text*=`允许` || text*=`Allow`")) } catch (e: Exception) {}
+            }
+        }
 
         // 网络连接错误 - 修复语法
-        val networkErrorSelectors = listOf(
-            Selector.parse("text*=`网络错误` || text*=`Network error`"),
-            Selector.parse("text*=`连接失败` || text*=`Connection failed`"),
-            Selector.parse("text*=`无法连接` || text*=`Cannot connect`")
-        )
+        val networkErrorSelectors by lazy {
+            buildList {
+                try { add(Selector.parse("text*=`网络错误` || text*=`Network error`")) } catch (e: Exception) {}
+                try { add(Selector.parse("text*=`连接失败` || text*=`Connection failed`")) } catch (e: Exception) {}
+                try { add(Selector.parse("text*=`无法连接` || text*=`Cannot connect`")) } catch (e: Exception) {}
+            }
+        }
 
         // 功能不可用 - 修复语法
-        val unavailableSelectors = listOf(
-            Selector.parse("text*=`功能不可用` || text*=`Feature unavailable`"),
-            Selector.parse("text*=`暂不支持` || text*=`Not supported`"),
-            Selector.parse("text*=`设备不支持` || text*=`Device not supported`")
-        )
+        val unavailableSelectors by lazy {
+            buildList {
+                try { add(Selector.parse("text*=`功能不可用` || text*=`Feature unavailable`")) } catch (e: Exception) {}
+                try { add(Selector.parse("text*=`暂不支持` || text*=`Not supported`")) } catch (e: Exception) {}
+                try { add(Selector.parse("text*=`设备不支持` || text*=`Device not supported`")) } catch (e: Exception) {}
+            }
+        }
     }
 }

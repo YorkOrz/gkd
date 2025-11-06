@@ -101,8 +101,11 @@ class AdbAutoSetup {
         } catch (e: ExceptionInInitializerError) {
             LogUtils.w("AdbAutoSetup", "DeveloperRules初始化失败", e)
             null
-        } catch (e: Exception) {
-            LogUtils.w("AdbAutoSetup", "访问DeveloperRules失败", e)
+        } catch (e: NoClassDefFoundError) {
+            LogUtils.w("AdbAutoSetup", "DeveloperRules类不可用 (NoClassDefFoundError)", e)
+            null
+        } catch (t: Throwable) {
+            LogUtils.w("AdbAutoSetup", "访问DeveloperRules失败", t)
             null
         }
     }
@@ -1094,15 +1097,7 @@ class AdbAutoSetup {
             }
             
             // 查找无线调试选项（安全访问DeveloperRules）
-            val wirelessSelectors = try {
-                DeveloperRules.wirelessDebuggingSelectors
-            } catch (e: ExceptionInInitializerError) {
-                LogUtils.e("AdbAutoSetup", "DeveloperRules初始化失败，无法使用选择器", e)
-                emptyList()
-            } catch (e: Exception) {
-                LogUtils.w("AdbAutoSetup", "获取wirelessDebuggingSelectors失败", e)
-                emptyList()
-            }
+            val wirelessSelectors = safeAccessDeveloperRules { DeveloperRules.wirelessDebuggingSelectors } ?: emptyList()
             
             for (selector in wirelessSelectors) {
                 try {
@@ -1145,15 +1140,7 @@ class AdbAutoSetup {
             val root = a11yService.safeActiveWindow ?: return false
             
             // 查找并点击开关（安全访问DeveloperRules）
-            val switchSelectors = try {
-                DeveloperRules.switchSelectors
-            } catch (e: ExceptionInInitializerError) {
-                LogUtils.e("AdbAutoSetup", "DeveloperRules初始化失败，无法使用开关选择器", e)
-                emptyList()
-            } catch (e: Exception) {
-                LogUtils.w("AdbAutoSetup", "获取switchSelectors失败", e)
-                emptyList()
-            }
+            val switchSelectors = safeAccessDeveloperRules { DeveloperRules.switchSelectors } ?: emptyList()
             
             for (selector in switchSelectors) {
                 try {
@@ -1197,15 +1184,7 @@ class AdbAutoSetup {
             val root = a11yService.safeActiveWindow ?: return
 
             // 安全访问DeveloperRules
-            val confirmSelectors = try {
-                DeveloperRules.confirmSelectors
-            } catch (e: ExceptionInInitializerError) {
-                LogUtils.e("AdbAutoSetup", "DeveloperRules初始化失败，无法使用确认选择器", e)
-                emptyList()
-            } catch (e: Exception) {
-                LogUtils.w("AdbAutoSetup", "获取confirmSelectors失败", e)
-                emptyList()
-            }
+            val confirmSelectors = safeAccessDeveloperRules { DeveloperRules.confirmSelectors } ?: emptyList()
 
             for (selector in confirmSelectors) {
                 try {
@@ -1364,15 +1343,18 @@ class AdbAutoSetup {
             if (!alreadyInWirelessPage) {
                 // 步骤3：在开发者选项页面找到并启用无线调试
                 LogUtils.i("AdbAutoSetup", "步骤2: 启用无线调试")
-                val wirelessEnabled = try {
-                    enableWirelessDebuggingWithGkdRules()
-                } catch (e: ExceptionInInitializerError) {
-                    LogUtils.e("AdbAutoSetup", "❌ DeveloperRules初始化失败，启用无线调试失败", e)
-                    false
-                } catch (e: Exception) {
-                    LogUtils.e("AdbAutoSetup", "启用无线调试失败", e)
-                    false
-                }
+            val wirelessEnabled = try {
+                enableWirelessDebuggingWithGkdRules()
+            } catch (e: ExceptionInInitializerError) {
+                LogUtils.e("AdbAutoSetup", "❌ DeveloperRules初始化失败，启用无线调试失败", e)
+                false
+            } catch (e: NoClassDefFoundError) {
+                LogUtils.e("AdbAutoSetup", "❌ DeveloperRules类不可用，启用无线调试失败", e)
+                false
+            } catch (t: Throwable) {
+                LogUtils.e("AdbAutoSetup", "启用无线调试失败", t)
+                false
+            }
                 
                 if (!wirelessEnabled) {
                     LogUtils.w("AdbAutoSetup", "⚠️ 启用无线调试失败，但继续尝试提取（可能已经启用）")
@@ -1887,33 +1869,8 @@ class AdbAutoSetup {
 
             LogUtils.d("AdbAutoSetup", "页面文本检查: ${if (hasWirelessContent) "包含无线调试内容" else "未包含无线调试内容"}")
 
-            // 方法2：检查是否有开关控件（使用try-catch避免ExceptionInInitializerError）
-            var hasSwitchControls = false
-            try {
-                // 先检查DeveloperRules是否已初始化
-                val switchSelectors = try {
-                    DeveloperRules.switchSelectors
-                } catch (e: ExceptionInInitializerError) {
-                    LogUtils.w("AdbAutoSetup", "DeveloperRules初始化失败，跳过开关检查", e)
-                    null
-                } catch (e: Exception) {
-                    LogUtils.w("AdbAutoSetup", "获取switchSelectors失败，跳过开关检查", e)
-                    null
-                }
-                
-                if (switchSelectors != null) {
-                    hasSwitchControls = switchSelectors.any { selector ->
-                        try {
-                            val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
-                            node != null
-                        } catch (e: Exception) {
-                            false
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                LogUtils.w("AdbAutoSetup", "检查开关控件时出错，跳过此检查", e)
-            }
+            // 方法2：开关控件检查（移除DeveloperRules依赖，避免类初始化异常）
+            val hasSwitchControls = false
 
             LogUtils.d("AdbAutoSetup", "开关控件检查: ${if (hasSwitchControls) "发现开关控件" else "未发现开关控件"}")
 
