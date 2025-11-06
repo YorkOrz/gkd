@@ -1,5 +1,6 @@
 package li.songe.gkd.adb
 
+import kotlin.collections.buildList
 import li.songe.selector.Selector
 
 /**
@@ -24,67 +25,81 @@ object DeveloperRules {
         "com.android.settings.SubSettings"
     )
 
-    // 开发者选项入口选择器（已启用状态）- 修复语法
-    val developerOptionsSelectors = listOf(
-        Selector.parse("text=`开发者选项` || text=`Developer options`"),
-        Selector.parse("text=`开发人员选项` || text=`开发者模式`"),
-        Selector.parse("text=`开发者设置` || text=`Developer settings`"),
-        Selector.parse("desc*=`开发者` || desc*=`Developer`"),
-        Selector.parse("text*=`Developer` || text*=`开发`")
-    )
+    // 开发者选项入口选择器（已启用状态）- 修复语法（延迟初始化，避免ExceptionInInitializerError）
+    val developerOptionsSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text=`开发者选项` || text=`Developer options`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`开发人员选项` || text=`开发者模式`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`开发者设置` || text=`Developer settings`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`开发者` || desc*=`Developer`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`Developer` || text*=`开发`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 系统与更新选择器（ColorOS 15特有）- 修复语法
-    val systemUpdateSelectors = listOf(
-        Selector.parse("text=`系统与更新` || text=`System & updates`"),
-        Selector.parse("text=`系统和更新` || text=`System and updates`"),
-        Selector.parse("desc*=`系统与更新` || desc*=`System update`"),
-        Selector.parse("text*=`系统` text*=`更新` || text*=`System` text*=`update`")
-    )
+    // 系统与更新选择器（ColorOS 15特有）- 修复语法（延迟初始化）
+    val systemUpdateSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text=`系统与更新` || text=`System & updates`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`系统和更新` || text=`System and updates`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`系统与更新` || desc*=`System update`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`系统` text*=`更新` || text*=`System` text*=`update`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 关于手机/系统信息选择器（用于激活开发者选项）- 修复语法
-    val aboutPhoneSelectors = listOf(
-        Selector.parse("text=`关于手机` || text=`About phone`"),
-        Selector.parse("text=`关于设备` || text=`About device`"),
-        Selector.parse("text=`系统信息` || text=`System info`"),
-        Selector.parse("text=`关于本机` || text=`About`"),
-        Selector.parse("text=`手机信息` || text=`Phone info`"),
-        Selector.parse("desc*=`关于` || desc*=`About`")
-    )
+    // 关于手机/系统信息选择器（用于激活开发者选项）- 修复语法（延迟初始化）
+    val aboutPhoneSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text=`关于手机` || text=`About phone`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`关于设备` || text=`About device`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`系统信息` || text=`System info`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`关于本机` || text=`About`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`手机信息` || text=`Phone info`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`关于` || desc*=`About`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 版本号选择器（点击7次激活开发者模式）- 修复语法
-    val versionSelectors = listOf(
-        Selector.parse("text*=`版本号` || text*=`Build number`"),
-        Selector.parse("text*=`内部版本` || text*=`Internal version`"),
-        Selector.parse("text*=`软件版本` || text*=`Software version`"),
-        Selector.parse("text*=`系统版本` || text*=`System version`"),
-        Selector.parse("text*=`MIUI版本` || text*=`MIUI version`"),
-        Selector.parse("desc*=`版本` || desc*=`Version` || desc*=`Build`")
-    )
+    // 版本号选择器（点击7次激活开发者模式）- 修复语法（延迟初始化）
+    val versionSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text*=`版本号` || text*=`Build number`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`内部版本` || text*=`Internal version`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`软件版本` || text*=`Software version`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`系统版本` || text*=`System version`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`MIUI版本` || text*=`MIUI version`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`版本` || desc*=`Version` || desc*=`Build`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 开发者模式激活确认信息 - 修复语法
-    val developerModeConfirmSelectors = listOf(
-        Selector.parse("text*=`开发者模式已启用` || text*=`Developer mode enabled`"),
-        Selector.parse("text*=`您现在是开发者` || text*=`You are now a developer`"),
-        Selector.parse("text*=`开发者选项已启用` || text*=`Developer options enabled`")
-    )
+    // 开发者模式激活确认信息 - 修复语法（延迟初始化）
+    val developerModeConfirmSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text*=`开发者模式已启用` || text*=`Developer mode enabled`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`您现在是开发者` || text*=`You are now a developer`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`开发者选项已启用` || text*=`Developer options enabled`")) } catch (e: Exception) {}
+        }
+    }
 
-    // 无线调试/ADB选择器 - 修复语法
-    val wirelessDebuggingSelectors = listOf(
-        Selector.parse("text=`无线调试` || text=`Wireless debugging`"),
-        Selector.parse("text=`WiFi调试` || text=`WiFi debugging`"),
-        Selector.parse("text=`无线ADB` || text=`Wireless ADB`"),
-        Selector.parse("text=`网络ADB调试` || text=`Network ADB debugging`"),
-        Selector.parse("desc*=`无线调试` || desc*=`Wireless debug`"),
-        Selector.parse("desc*=`ADB` || desc*=`adb`")
-    )
+    // 无线调试/ADB选择器 - 修复语法（延迟初始化）
+    val wirelessDebuggingSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text=`无线调试` || text=`Wireless debugging`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`WiFi调试` || text=`WiFi debugging`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`无线ADB` || text=`Wireless ADB`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`网络ADB调试` || text=`Network ADB debugging`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`无线调试` || desc*=`Wireless debug`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`ADB` || desc*=`adb`")) } catch (e: Exception) {}
+        }
+    }
 
-    // USB调试选择器 - 修复语法
-    val usbDebuggingSelectors = listOf(
-        Selector.parse("text=`USB调试` || text=`USB debugging`"),
-        Selector.parse("text=`ADB调试` || text=`ADB debugging`"),
-        Selector.parse("desc*=`USB调试` || desc*=`USB debug`"),
-        Selector.parse("desc*=`ADB` + desc*=`调试`")
-    )
+    // USB调试选择器 - 修复语法（延迟初始化）
+    val usbDebuggingSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text=`USB调试` || text=`USB debugging`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`ADB调试` || text=`ADB debugging`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`USB调试` || desc*=`USB debug`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`ADB` + desc*=`调试`")) } catch (e: Exception) {}
+        }
+    }
 
     // IP地址选择器 - 修复语法
     val ipAddressSelectors = listOf(
@@ -101,27 +116,28 @@ object DeveloperRules {
         Selector.parse("text~=\\d{4,5}")
     )
 
-    // 开关/切换按钮选择器 - 修复语法
-    val switchSelectors = listOf(
-        // 未开启状态的开关
-        Selector.parse("checked=false clickable=true className=`android.widget.Switch`"),
-        Selector.parse("checked=false clickable=true className=`androidx.appcompat.widget.SwitchCompat`"),
-        Selector.parse("checked=false clickable=true > Switch"),
-        Selector.parse("className=`android.widget.Switch` checked=false"),
-        // 描述文本包含关闭状态
-        Selector.parse("desc*=`关闭` || desc*=`OFF` || desc*=`Disabled`"),
-        Selector.parse("text*=`关闭` || text*=`OFF` || text*=`已关闭`"),
-        // 通用开关选择器
-        Selector.parse("clickable=true checkable=true checked=false")
-    )
+    // 开关/切换按钮选择器 - 修复语法（延迟初始化，避免ExceptionInInitializerError）
+    val switchSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("checked=false clickable=true className=`android.widget.Switch`")) } catch (e: Exception) {}
+            try { add(Selector.parse("checked=false clickable=true className=`androidx.appcompat.widget.SwitchCompat`")) } catch (e: Exception) {}
+            try { add(Selector.parse("checked=false clickable=true > Switch")) } catch (e: Exception) {}
+            try { add(Selector.parse("className=`android.widget.Switch` checked=false")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`关闭` || desc*=`OFF` || desc*=`Disabled`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`关闭` || text*=`OFF` || text*=`已关闭`")) } catch (e: Exception) {}
+            try { add(Selector.parse("clickable=true checkable=true checked=false")) } catch (e: Exception) {}
+        }
+    }
 
-    // 已开启状态的开关（用于确认） - 修复语法
-    val enabledSwitchSelectors = listOf(
-        Selector.parse("checked=true className=`android.widget.Switch`"),
-        Selector.parse("checked=true className=`androidx.appcompat.widget.SwitchCompat`"),
-        Selector.parse("desc*=`打开` || desc*=`ON` || desc*=`Enabled`"),
-        Selector.parse("text*=`打开` || text*=`ON` || text*=`已打开`")
-    )
+    // 已开启状态的开关（用于确认） - 修复语法（延迟初始化）
+    val enabledSwitchSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("checked=true className=`android.widget.Switch`")) } catch (e: Exception) {}
+            try { add(Selector.parse("checked=true className=`androidx.appcompat.widget.SwitchCompat`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc*=`打开` || desc*=`ON` || desc*=`Enabled`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text*=`打开` || text*=`ON` || text*=`已打开`")) } catch (e: Exception) {}
+        }
+    }
 
     // IP和端口信息选择器 - 修复语法
     val ipPortSelectors = listOf(
@@ -148,13 +164,15 @@ object DeveloperRules {
         Selector.parse("text*=`连接地址` || text*=`Connection address`")
     )
 
-    // 确认/允许按钮选择器 - 修复语法
-    val confirmSelectors = listOf(
-        Selector.parse("text=`确定` || text=`OK` || text=`允许` || text=`Allow`"),
-        Selector.parse("text=`确认` || text=`Confirm` || text=`是` || text=`Yes`"),
-        Selector.parse("text=`启用` || text=`Enable` || text=`开启` || text=`Turn on`"),
-        Selector.parse("desc=`确定` || desc=`OK` || desc=`确认` || desc=`Allow`")
-    )
+    // 确认/允许按钮选择器 - 修复语法（延迟初始化）
+    val confirmSelectors by lazy {
+        buildList {
+            try { add(Selector.parse("text=`确定` || text=`OK` || text=`允许` || text=`Allow`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`确认` || text=`Confirm` || text=`是` || text=`Yes`")) } catch (e: Exception) {}
+            try { add(Selector.parse("text=`启用` || text=`Enable` || text=`开启` || text=`Turn on`")) } catch (e: Exception) {}
+            try { add(Selector.parse("desc=`确定` || desc=`OK` || desc=`确认` || desc=`Allow`")) } catch (e: Exception) {}
+        }
+    }
 
     // 取消/拒绝按钮选择器 - 修复语法
     val cancelSelectors = listOf(

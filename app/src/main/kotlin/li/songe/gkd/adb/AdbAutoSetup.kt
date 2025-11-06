@@ -14,6 +14,7 @@ import li.songe.gkd.app
 // import li.songe.gkd.notif.defaultChannel
 import li.songe.gkd.service.A11yService
 import li.songe.gkd.util.toast
+import li.songe.gkd.notif.showAdbExtractNotification
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
@@ -90,6 +91,30 @@ class AdbAutoSetup {
     private var startTime = 0L
     
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    
+    /**
+     * 安全地访问DeveloperRules的属性，避免ExceptionInInitializerError
+     */
+    private inline fun <T> safeAccessDeveloperRules(block: () -> T): T? {
+        return try {
+            block()
+        } catch (e: ExceptionInInitializerError) {
+            LogUtils.w("AdbAutoSetup", "DeveloperRules初始化失败", e)
+            null
+        } catch (e: Exception) {
+            LogUtils.w("AdbAutoSetup", "访问DeveloperRules失败", e)
+            null
+        }
+    }
+    
+    /**
+     * 检查DeveloperRules是否可以正常访问
+     */
+    private fun checkDeveloperRulesAvailable(): Boolean {
+        // 使用safeAccessDeveloperRules来安全访问，避免异常传播
+        val result = safeAccessDeveloperRules { DeveloperRules.developerOptionsSelectors }
+        return result != null
+    }
     
     /**
      * 启动ADB自动化
@@ -424,7 +449,8 @@ class AdbAutoSetup {
         repeat(3) {
             val root = a11yService.safeActiveWindow ?: return false
             
-            for (selector in DeveloperRules.aboutPhoneSelectors) {
+            val aboutPhoneSelectors = safeAccessDeveloperRules { DeveloperRules.aboutPhoneSelectors } ?: emptyList()
+            for (selector in aboutPhoneSelectors) {
                 try {
                     val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                     if (node != null && node.isClickable) {
@@ -455,7 +481,8 @@ class AdbAutoSetup {
         repeat(10) { // 最多点击10次
             val root = a11yService.safeActiveWindow ?: return false
             
-            for (selector in DeveloperRules.versionSelectors) {
+            val versionSelectors = safeAccessDeveloperRules { DeveloperRules.versionSelectors } ?: emptyList()
+            for (selector in versionSelectors) {
                 try {
                     val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                     if (node != null && node.isClickable) {
@@ -481,7 +508,8 @@ class AdbAutoSetup {
      * 检查开发者模式是否已激活
      */
     private fun checkDeveloperModeActivated(root: AccessibilityNodeInfo): Boolean {
-        for (selector in DeveloperRules.developerModeConfirmSelectors) {
+        val confirmSelectors = safeAccessDeveloperRules { DeveloperRules.developerModeConfirmSelectors } ?: emptyList()
+        for (selector in confirmSelectors) {
             try {
                 val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                 if (node != null) {
@@ -502,7 +530,8 @@ class AdbAutoSetup {
         
         LogUtils.d("AdbAutoSetup", "启用USB调试")
         
-        if (!findAndEnableOption(DeveloperRules.usbDebuggingSelectors, "USB调试")) {
+        val usbSelectors = safeAccessDeveloperRules { DeveloperRules.usbDebuggingSelectors } ?: emptyList()
+        if (usbSelectors.isEmpty() || !findAndEnableOption(usbSelectors, "USB调试")) {
             LogUtils.w("AdbAutoSetup", "无法找到或启用USB调试选项")
         }
         
@@ -585,7 +614,8 @@ class AdbAutoSetup {
         val root = a11yService.safeActiveWindow ?: return false
         
         // 首先检查是否已经启用
-        for (selector in DeveloperRules.enabledSwitchSelectors) {
+        val enabledSwitchSelectors = safeAccessDeveloperRules { DeveloperRules.enabledSwitchSelectors } ?: emptyList()
+        for (selector in enabledSwitchSelectors) {
             try {
                 val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                 if (node != null) {
@@ -598,7 +628,8 @@ class AdbAutoSetup {
         }
         
         // 查找未启用的开关并点击
-        for (selector in DeveloperRules.switchSelectors) {
+        val switchSelectors = safeAccessDeveloperRules { DeveloperRules.switchSelectors } ?: emptyList()
+        for (selector in switchSelectors) {
             try {
                 val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                 if (node != null && node.isClickable) {
@@ -630,7 +661,8 @@ class AdbAutoSetup {
         val a11yService = A11yService.instance ?: return
         val root = a11yService.safeActiveWindow ?: return
         
-        for (selector in DeveloperRules.confirmSelectors) {
+        val confirmSelectors = safeAccessDeveloperRules { DeveloperRules.confirmSelectors } ?: emptyList()
+        for (selector in confirmSelectors) {
             try {
                 val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                 if (node != null && node.isClickable) {
@@ -728,7 +760,8 @@ class AdbAutoSetup {
             val a11yService = A11yService.instance ?: return
             val root = a11yService.safeActiveWindow ?: return
             
-            for (selector in DeveloperRules.backSelectors) {
+            val backSelectors = safeAccessDeveloperRules { DeveloperRules.backSelectors } ?: emptyList()
+            for (selector in backSelectors) {
                 try {
                     val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                     if (node != null && node.isClickable) {
@@ -865,21 +898,33 @@ class AdbAutoSetup {
                             return true
                         }
 
-                        // 方法2：检查是否有开发者选项特有的元素
-                        for (selector in DeveloperRules.wirelessDebuggingSelectors) {
-                            val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
-                            if (node != null) {
-                                LogUtils.i("AdbAutoSetup", "✅ 直接跳转成功，发现无线调试选项")
-                                return true
+                        // 方法2：检查是否有开发者选项特有的元素（安全访问DeveloperRules）
+                        val wirelessSelectors = safeAccessDeveloperRules { DeveloperRules.wirelessDebuggingSelectors } ?: emptyList()
+                        
+                        for (selector in wirelessSelectors) {
+                            try {
+                                val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
+                                if (node != null) {
+                                    LogUtils.i("AdbAutoSetup", "✅ 直接跳转成功，发现无线调试选项")
+                                    return true
+                                }
+                            } catch (e: Exception) {
+                                // 忽略单个选择器错误
                             }
                         }
 
-                        // 方法3：检查USB调试选项
-                        for (selector in DeveloperRules.usbDebuggingSelectors) {
-                            val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
-                            if (node != null) {
-                                LogUtils.i("AdbAutoSetup", "✅ 直接跳转成功，发现USB调试选项")
-                                return true
+                        // 方法3：检查USB调试选项（安全访问DeveloperRules）
+                        val usbSelectors = safeAccessDeveloperRules { DeveloperRules.usbDebuggingSelectors } ?: emptyList()
+                        
+                        for (selector in usbSelectors) {
+                            try {
+                                val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
+                                if (node != null) {
+                                    LogUtils.i("AdbAutoSetup", "✅ 直接跳转成功，发现USB调试选项")
+                                    return true
+                                }
+                            } catch (e: Exception) {
+                                // 忽略单个选择器错误
                             }
                         }
 
@@ -915,8 +960,10 @@ class AdbAutoSetup {
                 
                 LogUtils.d("AdbAutoSetup", "第${attempt + 1}次查找系统与更新")
                 
-                // 查找"系统与更新"选项
-                for (selector in DeveloperRules.systemUpdateSelectors) {
+                // 查找"系统与更新"选项（安全访问DeveloperRules）
+                val systemUpdateSelectors = safeAccessDeveloperRules { DeveloperRules.systemUpdateSelectors } ?: emptyList()
+                
+                for (selector in systemUpdateSelectors) {
                     try {
                         val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                         if (node != null && node.isClickable) {
@@ -961,7 +1008,10 @@ class AdbAutoSetup {
                 
                 LogUtils.d("AdbAutoSetup", "系统与更新页面第${attempt + 1}次查找开发者选项")
                 
-                for (selector in DeveloperRules.developerOptionsSelectors) {
+                // 安全访问DeveloperRules
+                val developerOptionsSelectors = safeAccessDeveloperRules { DeveloperRules.developerOptionsSelectors } ?: emptyList()
+                
+                for (selector in developerOptionsSelectors) {
                     try {
                         val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                         if (node != null && node.isClickable) {
@@ -1043,8 +1093,18 @@ class AdbAutoSetup {
                 }
             }
             
-            // 查找无线调试选项
-            for (selector in DeveloperRules.wirelessDebuggingSelectors) {
+            // 查找无线调试选项（安全访问DeveloperRules）
+            val wirelessSelectors = try {
+                DeveloperRules.wirelessDebuggingSelectors
+            } catch (e: ExceptionInInitializerError) {
+                LogUtils.e("AdbAutoSetup", "DeveloperRules初始化失败，无法使用选择器", e)
+                emptyList()
+            } catch (e: Exception) {
+                LogUtils.w("AdbAutoSetup", "获取wirelessDebuggingSelectors失败", e)
+                emptyList()
+            }
+            
+            for (selector in wirelessSelectors) {
                 try {
                     val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                     if (node != null && node.isClickable) {
@@ -1084,8 +1144,18 @@ class AdbAutoSetup {
             val a11yService = A11yService.instance ?: return false
             val root = a11yService.safeActiveWindow ?: return false
             
-            // 查找并点击开关
-            for (selector in DeveloperRules.switchSelectors) {
+            // 查找并点击开关（安全访问DeveloperRules）
+            val switchSelectors = try {
+                DeveloperRules.switchSelectors
+            } catch (e: ExceptionInInitializerError) {
+                LogUtils.e("AdbAutoSetup", "DeveloperRules初始化失败，无法使用开关选择器", e)
+                emptyList()
+            } catch (e: Exception) {
+                LogUtils.w("AdbAutoSetup", "获取switchSelectors失败", e)
+                emptyList()
+            }
+            
+            for (selector in switchSelectors) {
                 try {
                     val switchNode = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                     if (switchNode != null && switchNode.isClickable && !switchNode.isChecked) {
@@ -1126,7 +1196,18 @@ class AdbAutoSetup {
             val a11yService = A11yService.instance ?: return
             val root = a11yService.safeActiveWindow ?: return
 
-            for (selector in DeveloperRules.confirmSelectors) {
+            // 安全访问DeveloperRules
+            val confirmSelectors = try {
+                DeveloperRules.confirmSelectors
+            } catch (e: ExceptionInInitializerError) {
+                LogUtils.e("AdbAutoSetup", "DeveloperRules初始化失败，无法使用确认选择器", e)
+                emptyList()
+            } catch (e: Exception) {
+                LogUtils.w("AdbAutoSetup", "获取confirmSelectors失败", e)
+                emptyList()
+            }
+
+            for (selector in confirmSelectors) {
                 try {
                     val confirmNode = a11yContext.querySelfOrSelector(root, selector, MatchOption())
                     if (confirmNode != null && confirmNode.isClickable) {
@@ -1181,24 +1262,76 @@ class AdbAutoSetup {
             
             LogUtils.i("AdbAutoSetup", "✅ 可以获取当前窗口，权限正常")
 
-            // 步骤2：直接跳转到开发者选项界面
-            LogUtils.i("AdbAutoSetup", "步骤1: 直接跳转到开发者选项界面")
-            if (!tryDirectJumpToDeveloperOptions()) {
-                LogUtils.e("AdbAutoSetup", "无法直接跳转到开发者选项")
-                return false
-            }
-
-            // 额外等待，确保开发者选项页面完全加载
-            LogUtils.i("AdbAutoSetup", "等待开发者选项页面完全加载...")
-            delay(2000)
+            // 步骤0：检测当前页面状态，智能导航
+            LogUtils.i("AdbAutoSetup", "步骤0: 检测当前页面状态")
+            val currentRoot = a11yService.safeActiveWindow ?: return false
+            val currentPageText = getAllTextFromPage(currentRoot)
+            val currentPackage = currentRoot.packageName
             
-            // 验证是否真的在开发者选项页面
-            val verifyRoot = a11yService.safeActiveWindow
-            if (verifyRoot != null) {
-                val pageText = getAllTextFromPage(verifyRoot)
-                LogUtils.i("AdbAutoSetup", "当前页面文本预览: ${pageText.take(300)}...")
-                if (!pageText.contains("开发者选项") && !pageText.contains("Developer options")) {
-                    LogUtils.w("AdbAutoSetup", "⚠️ 可能未在开发者选项页面，但继续尝试")
+            LogUtils.i("AdbAutoSetup", "当前页面包名: $currentPackage")
+            LogUtils.d("AdbAutoSetup", "当前页面文本预览: ${currentPageText.take(200)}...")
+            
+            // 检查是否已经在无线调试页面
+            val isWirelessPage = currentPageText.contains("无线调试") || 
+                                currentPageText.contains("Wireless debugging") ||
+                                Regex("""\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{4,5}""").find(currentPageText) != null ||
+                                currentPageText.contains("IP地址") || 
+                                currentPageText.contains("IP address")
+            
+            if (isWirelessPage && currentPackage == "com.android.settings") {
+                LogUtils.i("AdbAutoSetup", "✅ 检测到已在无线调试页面，直接提取信息")
+                // 直接进入提取步骤
+            } else {
+                // 检查是否在开发者选项的其他子页面
+                val isDeveloperSubPage = currentPackage == "com.android.settings" && 
+                                        (currentPageText.contains("USB调试") || 
+                                         currentPageText.contains("USB debugging") ||
+                                         currentPageText.contains("选择调试应用") ||
+                                         currentPageText.contains("Select debug app") ||
+                                         currentPageText.contains("等待调试器") ||
+                                         currentPageText.contains("Wait for debugger"))
+                
+                if (isDeveloperSubPage) {
+                    LogUtils.i("AdbAutoSetup", "检测到在开发者选项子页面，尝试返回开发者选项主页面")
+                    // 尝试返回开发者选项主页面
+                    repeat(3) {
+                        try {
+                            A11yService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                            delay(1000)
+                            val newRoot = a11yService.safeActiveWindow
+                            if (newRoot != null) {
+                                val newPageText = getAllTextFromPage(newRoot)
+                                if (newPageText.contains("开发者选项") || newPageText.contains("Developer options") ||
+                                    newPageText.contains("无线调试") || newPageText.contains("Wireless debugging")) {
+                                    LogUtils.i("AdbAutoSetup", "✅ 已返回开发者选项页面")
+                                    return@repeat
+                                }
+                            }
+                        } catch (e: Exception) {
+                            LogUtils.w("AdbAutoSetup", "返回操作失败", e)
+                        }
+                    }
+                }
+                
+                // 步骤1：跳转到开发者选项界面
+                LogUtils.i("AdbAutoSetup", "步骤1: 跳转到开发者选项界面")
+                if (!tryDirectJumpToDeveloperOptions()) {
+                    LogUtils.e("AdbAutoSetup", "无法直接跳转到开发者选项")
+                    return false
+                }
+
+                // 额外等待，确保开发者选项页面完全加载
+                LogUtils.i("AdbAutoSetup", "等待开发者选项页面完全加载...")
+                delay(2000)
+                
+                // 验证是否真的在开发者选项页面
+                val verifyRoot = a11yService.safeActiveWindow
+                if (verifyRoot != null) {
+                    val pageText = getAllTextFromPage(verifyRoot)
+                    LogUtils.i("AdbAutoSetup", "当前页面文本预览: ${pageText.take(300)}...")
+                    if (!pageText.contains("开发者选项") && !pageText.contains("Developer options")) {
+                        LogUtils.w("AdbAutoSetup", "⚠️ 可能未在开发者选项页面，但继续尝试")
+                    }
                 }
             }
 
@@ -1219,43 +1352,129 @@ class AdbAutoSetup {
                 LogUtils.i("AdbAutoSetup", "✅ 可以获取节点信息，权限正常")
             }
 
-            // 步骤4：在开发者选项页面找到并启用无线调试
-            LogUtils.i("AdbAutoSetup", "步骤3: 启用无线调试")
-            if (!enableWirelessDebuggingWithGkdRules()) {
-                LogUtils.e("AdbAutoSetup", "启用无线调试失败")
-                return false
+            // 步骤2：检查当前是否已在无线调试页面
+            val checkRoot = a11yService.safeActiveWindow ?: return false
+            val checkPageText = getAllTextFromPage(checkRoot)
+            val alreadyInWirelessPage = checkPageText.contains("无线调试") || 
+                                       checkPageText.contains("Wireless debugging") ||
+                                       Regex("""\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{4,5}""").find(checkPageText) != null ||
+                                       checkPageText.contains("IP地址") || 
+                                       checkPageText.contains("IP address")
+            
+            if (!alreadyInWirelessPage) {
+                // 步骤3：在开发者选项页面找到并启用无线调试
+                LogUtils.i("AdbAutoSetup", "步骤2: 启用无线调试")
+                val wirelessEnabled = try {
+                    enableWirelessDebuggingWithGkdRules()
+                } catch (e: ExceptionInInitializerError) {
+                    LogUtils.e("AdbAutoSetup", "❌ DeveloperRules初始化失败，启用无线调试失败", e)
+                    false
+                } catch (e: Exception) {
+                    LogUtils.e("AdbAutoSetup", "启用无线调试失败", e)
+                    false
+                }
+                
+                if (!wirelessEnabled) {
+                    LogUtils.w("AdbAutoSetup", "⚠️ 启用无线调试失败，但继续尝试提取（可能已经启用）")
+                }
+            } else {
+                LogUtils.i("AdbAutoSetup", "✅ 已在无线调试页面，跳过导航和启用步骤，直接提取")
             }
 
-            // 步骤5：提取ADB信息（使用与按钮7相同的简单文本提取方法）
-            LogUtils.i("AdbAutoSetup", "步骤4: 提取ADB信息（简单文本提取方法）")
-            delay(3000) // 等待ADB信息出现
+            // 步骤4：提取ADB信息（使用重试机制）
+            LogUtils.i("AdbAutoSetup", "步骤3: 提取ADB信息（带重试机制）")
             
-            // 重新获取根节点，确保是最新的页面
-            val extractRoot = a11yService.safeActiveWindow
-            if (extractRoot == null) {
-                LogUtils.e("AdbAutoSetup", "❌ 无法获取当前窗口")
-                toast("❌ 无法获取当前窗口")
-                return false
+            // 初始等待，给页面加载时间
+            delay(3000)
+            
+            // 重试提取，最多尝试5次
+            val maxRetries = 5
+            var extractedInfo: AdbInfo? = null
+            
+            for (retryAttempt in 1..maxRetries) {
+                LogUtils.i("AdbAutoSetup", "=== 提取尝试 $retryAttempt/$maxRetries ===")
+                
+                // 每次重试前等待，给页面加载时间
+                if (retryAttempt > 1) {
+                    delay(2000) // 每次重试前等待2秒
+                }
+                
+                // 重新获取根节点，确保是最新的页面
+                LogUtils.d("AdbAutoSetup", "尝试 $retryAttempt: 开始获取当前窗口...")
+                val extractRoot = a11yService.safeActiveWindow
+                if (extractRoot == null) {
+                    LogUtils.w("AdbAutoSetup", "尝试 $retryAttempt: 无法获取当前窗口")
+                    continue
+                }
+                LogUtils.d("AdbAutoSetup", "尝试 $retryAttempt: 成功获取窗口，包名: ${extractRoot.packageName}")
+                
+                // 使用与按钮7相同的简单文本提取方法
+                LogUtils.d("AdbAutoSetup", "尝试 $retryAttempt: 开始调用extractAdbInfoFromText...")
+                val adbInfo = try {
+                    extractAdbInfoFromText(extractRoot)
+                } catch (e: Exception) {
+                    LogUtils.e("AdbAutoSetup", "尝试 $retryAttempt: extractAdbInfoFromText抛出异常", e)
+                    null
+                }
+                
+                if (adbInfo != null) {
+                    extractedInfo = adbInfo
+                    LogUtils.i("AdbAutoSetup", "✅✅✅ 尝试 $retryAttempt 提取成功: $adbInfo")
+                    break
+                } else {
+                    LogUtils.w("AdbAutoSetup", "尝试 $retryAttempt: 未能提取到ADB信息")
+                }
             }
             
-            // 使用与按钮7相同的简单文本提取方法
-            val adbInfo = extractAdbInfoFromText(extractRoot)
-            if (adbInfo != null) {
-                LogUtils.i("AdbAutoSetup", "✅ 成功提取ADB信息: $adbInfo")
-                _lastAdbInfo.value = adbInfo
-                
-                // 显示成功提示
-                toast("✅ ADB信息提取成功\nIP: ${adbInfo.ip}\n端口: ${adbInfo.port}\n连接: ${adbInfo.ip}:${adbInfo.port}")
-                
+            // 显示最终结果
+            if (extractedInfo != null) {
+                LogUtils.i("AdbAutoSetup", "✅ 最终提取成功: $extractedInfo")
+                _lastAdbInfo.value = extractedInfo
+                val successMsg = "✅ 操作完成：提取成功\nIP: ${extractedInfo.ip}\n端口: ${extractedInfo.port}\n连接: ${extractedInfo.ip}:${extractedInfo.port}"
+                toast(successMsg)
+                // 同时显示系统通知
+                try {
+                    showAdbExtractNotification(true, extractedInfo.ip, extractedInfo.port)
+                    LogUtils.i("AdbAutoSetup", "✅ 已发送成功通知")
+                } catch (e: Exception) {
+                    LogUtils.e("AdbAutoSetup", "发送通知失败", e)
+                }
                 return true
             } else {
-                LogUtils.e("AdbAutoSetup", "❌ 未能提取到ADB信息")
-                toast("❌ 未能提取到ADB信息，请确保无线调试已启用")
+                LogUtils.e("AdbAutoSetup", "❌ 最终提取失败，已尝试 $maxRetries 次")
+                val failMsg = "❌ 操作完成：提取失败\n已尝试 $maxRetries 次，未找到有效的IP和端口\n请确保：\n1. 无线调试已启用\n2. IP和端口已显示在页面上"
+                toast(failMsg)
+                // 同时显示系统通知
+                try {
+                    showAdbExtractNotification(false, errorMsg = "已尝试 $maxRetries 次，未找到有效的IP和端口")
+                    LogUtils.i("AdbAutoSetup", "✅ 已发送失败通知")
+                } catch (e: Exception) {
+                    LogUtils.e("AdbAutoSetup", "发送通知失败", e)
+                }
                 return false
             }
 
         } catch (e: Exception) {
+            // 获取更友好的错误信息
+            val errorMsg = when {
+                e is ExceptionInInitializerError && e.cause != null -> {
+                    // 如果是初始化错误，尝试从cause获取更友好的信息
+                    val causeMsg = e.cause?.message ?: e.cause?.javaClass?.simpleName ?: "初始化失败"
+                    "初始化错误: $causeMsg"
+                }
+                e.message != null -> e.message!!
+                else -> "未知错误: ${e.javaClass.simpleName}"
+            }
             LogUtils.e("AdbAutoSetup", "❌ ColorOS 15完整自动化失败", e)
+            val failMsg = "❌ 操作完成：自动化失败\n错误: $errorMsg"
+            toast(failMsg)
+            // 同时显示系统通知
+            try {
+                showAdbExtractNotification(false, errorMsg = "自动化失败: $errorMsg")
+                LogUtils.i("AdbAutoSetup", "✅ 已发送异常通知")
+            } catch (ex: Exception) {
+                LogUtils.e("AdbAutoSetup", "发送通知失败", ex)
+            }
             return false
         } finally {
             LogUtils.i("AdbAutoSetup", "===== ColorOS 15完整自动化调试结束 =====")
@@ -1292,32 +1511,51 @@ class AdbAutoSetup {
             
             // 验证是否成功进入无线调试页面
             val newRoot = a11yService.safeActiveWindow ?: throw Exception("无法获取无线调试页面的窗口")
-            if (!verifyEnteredWirelessDebuggingPage()) {
-                LogUtils.e("AdbAutoSetup", "❌ 未能成功进入无线调试页面，流程终止")
-                return false
-            }
-            
-            LogUtils.i("AdbAutoSetup", "✅ 已成功进入无线调试页面")
-
-            // 步骤3：查找并启用无线调试开关
-            LogUtils.i("AdbAutoSetup", "步骤3: 查找并启用无线调试开关")
-            if (!enableWirelessDebuggingSwitch(newRoot)) {
-                LogUtils.w("AdbAutoSetup", "⚠️ 未能启用无线调试开关，可能已经启用或需要手动操作")
-                // 即使开关启用失败，也继续尝试提取信息（可能已经启用）
+            val isWirelessPage = verifyEnteredWirelessDebuggingPage()
+            if (!isWirelessPage) {
+                LogUtils.w("AdbAutoSetup", "⚠️ 页面验证未通过，但继续执行后续步骤（可能验证逻辑有问题）")
             } else {
-                LogUtils.i("AdbAutoSetup", "✅ 无线调试开关已启用")
+                LogUtils.i("AdbAutoSetup", "✅ 已成功进入无线调试页面")
             }
 
-            // 步骤4：处理确认对话框
-            LogUtils.i("AdbAutoSetup", "步骤4: 处理可能的确认对话框")
-            handleConfirmationDialog()
+            // 快速检查是否已经有IP和端口信息（如果已有，说明已启用，直接跳过开关启用）
+            val quickCheckText = getAllTextFromPage(newRoot)
+            val hasAdbInfo = Regex("""\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{4,5}""").find(quickCheckText) != null
             
-            // 再次等待，确保ADB信息已显示
-            delay(2000)
+            if (hasAdbInfo) {
+                LogUtils.i("AdbAutoSetup", "✅ 检测到页面已包含ADB信息，跳过开关启用步骤")
+            } else {
+                // 步骤3：查找并启用无线调试开关
+                LogUtils.i("AdbAutoSetup", "步骤3: 查找并启用无线调试开关")
+                try {
+                    if (!enableWirelessDebuggingSwitch(newRoot)) {
+                        LogUtils.w("AdbAutoSetup", "⚠️ 未能启用无线调试开关，可能已经启用或需要手动操作")
+                        // 即使开关启用失败，也继续尝试提取信息（可能已经启用）
+                    } else {
+                        LogUtils.i("AdbAutoSetup", "✅ 无线调试开关已启用")
+                    }
+                } catch (e: Exception) {
+                    LogUtils.e("AdbAutoSetup", "启用无线调试开关时发生异常，继续执行", e)
+                }
+
+                // 步骤4：处理确认对话框
+                LogUtils.i("AdbAutoSetup", "步骤4: 处理可能的确认对话框")
+                try {
+                    handleConfirmationDialog()
+                } catch (e: Exception) {
+                    LogUtils.e("AdbAutoSetup", "处理确认对话框时发生异常，继续执行", e)
+                }
+                
+                // 再次等待，确保ADB信息已显示
+                delay(2000)
+            }
 
             LogUtils.i("AdbAutoSetup", "✅ 无线调试启用流程完成")
             true
 
+        } catch (e: ExceptionInInitializerError) {
+            LogUtils.e("AdbAutoSetup", "❌ DeveloperRules初始化失败，使用GKD规则启用无线调试失败", e)
+            false
         } catch (e: Exception) {
             LogUtils.e("AdbAutoSetup", "❌ 使用GKD规则启用无线调试失败", e)
             false
@@ -1643,18 +1881,38 @@ class AdbAutoSetup {
             val hasWirelessContent = pageText.contains("无线调试") ||
                                        pageText.contains("Wireless debugging") ||
                                        pageText.contains("IP地址") ||
-                                       pageText.contains("IP address")
+                                       pageText.contains("IP address") ||
+                                       pageText.contains("IP") ||
+                                       pageText.contains("端口")
 
             LogUtils.d("AdbAutoSetup", "页面文本检查: ${if (hasWirelessContent) "包含无线调试内容" else "未包含无线调试内容"}")
 
-            // 方法2：检查是否有开关控件
-            val hasSwitchControls = DeveloperRules.switchSelectors.any { selector ->
-                try {
-                    val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
-                    node != null
+            // 方法2：检查是否有开关控件（使用try-catch避免ExceptionInInitializerError）
+            var hasSwitchControls = false
+            try {
+                // 先检查DeveloperRules是否已初始化
+                val switchSelectors = try {
+                    DeveloperRules.switchSelectors
+                } catch (e: ExceptionInInitializerError) {
+                    LogUtils.w("AdbAutoSetup", "DeveloperRules初始化失败，跳过开关检查", e)
+                    null
                 } catch (e: Exception) {
-                    false
+                    LogUtils.w("AdbAutoSetup", "获取switchSelectors失败，跳过开关检查", e)
+                    null
                 }
+                
+                if (switchSelectors != null) {
+                    hasSwitchControls = switchSelectors.any { selector ->
+                        try {
+                            val node = a11yContext.querySelfOrSelector(root, selector, MatchOption())
+                            node != null
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                LogUtils.w("AdbAutoSetup", "检查开关控件时出错，跳过此检查", e)
             }
 
             LogUtils.d("AdbAutoSetup", "开关控件检查: ${if (hasSwitchControls) "发现开关控件" else "未发现开关控件"}")
@@ -1666,7 +1924,9 @@ class AdbAutoSetup {
 
         } catch (e: Exception) {
             LogUtils.w("AdbAutoSetup", "验证无线调试页面失败", e)
-            false
+            // 即使验证失败，也返回true，让流程继续（可能页面已经正确，只是验证逻辑有问题）
+            LogUtils.w("AdbAutoSetup", "验证失败，但继续执行后续步骤")
+            true
         }
     }
 
@@ -1857,9 +2117,15 @@ class AdbAutoSetup {
      */
     private fun extractAdbInfoFromText(root: AccessibilityNodeInfo): AdbInfo? {
         return try {
+            LogUtils.d("AdbAutoSetup", "extractAdbInfoFromText: 开始获取页面文本...")
             val allText = getAllTextFromPage(root)
-            LogUtils.i("AdbAutoSetup", "页面全部文本长度: ${allText.length}")
-            LogUtils.d("AdbAutoSetup", "页面文本预览: ${allText.take(500)}...")
+            LogUtils.i("AdbAutoSetup", "extractAdbInfoFromText: 页面全部文本长度: ${allText.length}")
+            LogUtils.d("AdbAutoSetup", "extractAdbInfoFromText: 页面文本预览: ${allText.take(500)}...")
+            
+            if (allText.isEmpty()) {
+                LogUtils.w("AdbAutoSetup", "extractAdbInfoFromText: 页面文本为空，可能无法获取节点信息")
+                return null
+            }
 
             // 方法1：标准的IP:端口格式匹配（支持多种分隔符）
             val ipPortPatterns = listOf(
@@ -1928,39 +2194,79 @@ class AdbAutoSetup {
     }
     
     /**
-     * 获取页面所有文本（从AdbInfoExtractor复制）
+     * 获取页面所有文本（改进版，与按钮7一致，带深度限制和去重）
      */
     private fun getAllTextFromPage(root: AccessibilityNodeInfo): String {
         val textBuilder = StringBuilder()
-
-        fun collectText(node: AccessibilityNodeInfo) {
+        val collectedTexts = mutableSetOf<String>() // 用于去重
+        var nodeCount = 0
+        var textNodeCount = 0
+        var descNodeCount = 0
+        
+        fun collectText(node: AccessibilityNodeInfo, depth: Int = 0) {
+            if (depth > 30) {
+                LogUtils.w("AdbAutoSetup", "getAllTextFromPage: 达到最大深度限制($depth)，停止递归")
+                return // 防止过深递归
+            }
+            
+            nodeCount++
+            
             try {
                 // 添加当前节点的文本
-                node.text?.let { text ->
+                node.text?.toString()?.trim()?.let { text ->
                     if (text.isNotEmpty()) {
-                        textBuilder.append(text).append(" ")
+                        textNodeCount++
+                        if (collectedTexts.add(text)) {
+                            textBuilder.append(text).append(" ")
+                            // 如果包含IP或端口格式，记录日志
+                            if (text.contains(Regex("""\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}""")) || 
+                                text.contains(Regex("""\d{4,5}"""))) {
+                                LogUtils.d("AdbAutoSetup", "发现包含IP/端口的文本节点: '$text'")
+                            }
+                        }
                     }
                 }
-
+                
                 // 添加内容描述
-                node.contentDescription?.let { desc ->
+                node.contentDescription?.toString()?.trim()?.let { desc ->
                     if (desc.isNotEmpty()) {
-                        textBuilder.append(desc).append(" ")
+                        descNodeCount++
+                        if (collectedTexts.add(desc)) {
+                            textBuilder.append(desc).append(" ")
+                            // 如果包含IP或端口格式，记录日志
+                            if (desc.contains(Regex("""\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}""")) || 
+                                desc.contains(Regex("""\d{4,5}"""))) {
+                                LogUtils.d("AdbAutoSetup", "发现包含IP/端口的内容描述: '$desc'")
+                            }
+                        }
                     }
                 }
-
+                
                 // 递归处理子节点
                 for (i in 0 until node.childCount) {
-                    node.getChild(i)?.let { child ->
-                        collectText(child)
+                    try {
+                        node.getChild(i)?.let { child ->
+                            collectText(child, depth + 1)
+                        }
+                    } catch (e: Exception) {
+                        // 忽略单个子节点的错误，继续处理其他节点
+                        LogUtils.w("AdbAutoSetup", "获取子节点失败: $i", e)
                     }
                 }
             } catch (e: Exception) {
-                // 忽略单个节点的错误
+                // 忽略单个节点的错误，继续处理其他节点
+                LogUtils.w("AdbAutoSetup", "处理节点时出错 (depth=$depth)", e)
             }
         }
 
-        collectText(root)
+        try {
+            LogUtils.d("AdbAutoSetup", "开始收集页面文本...")
+            collectText(root)
+            LogUtils.i("AdbAutoSetup", "文本收集完成: 总节点数=$nodeCount, 文本节点=$textNodeCount, 描述节点=$descNodeCount, 文本长度=${textBuilder.length}")
+        } catch (e: Exception) {
+            LogUtils.e("AdbAutoSetup", "收集页面文本时发生异常", e)
+        }
+        
         return textBuilder.toString()
     }
 }

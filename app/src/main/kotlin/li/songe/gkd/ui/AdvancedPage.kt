@@ -621,25 +621,26 @@ fun AdvancedPage() {
                                     val autoSetup = li.songe.gkd.adb.AdbAutoSetup()
                                     val success = autoSetup.triggerColorOS15FullAutomation()
 
-                                    if (success) {
-                                        toast("✅ ColorOS 15自动化完成！")
-                                        // 提取最后成功的ADB信息
+                                    // 函数内部已经显示了完成提示，这里不再重复显示
+                                    // 如果函数返回false但没有显示提示，说明是异常情况
+                                    if (!success) {
+                                        // 检查是否有提取到的信息
                                         val lastAdbInfo = autoSetup.lastAdbInfo.value
-                                        if (lastAdbInfo != null) {
-                                            toast("ADB信息: $lastAdbInfo")
+                                        if (lastAdbInfo == null) {
+                                            // 如果函数没有显示提示，这里补充一个
+                                            LogUtils.w("AdbAutoSetup", "自动化流程完成，但未显示提示")
                                         }
-                                    } else {
-                                        toast("❌ ColorOS 15自动化失败，请查看logcat")
                                     }
                                 }
                             }, 3000)
                         } catch (e: Exception) {
-                            toast("自动化启动失败: ${e.message}")
+                            toast("❌ 操作完成：自动化启动失败\n错误: ${e.message}")
+                            LogUtils.e("AdbAutoSetup", "自动化启动失败: ${e.message}", e)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("5. ColorOS 15完整自动化 🚀")
+                    Text("5. ColorOS 15完整自动化 🚀 (重试版)")
                 }
                 
                 // 调试当前页面按钮
@@ -662,143 +663,116 @@ fun AdvancedPage() {
                         vm.viewModelScope.launchTry {
                             toast("3秒后开始提取ADB信息，请确保已在无线调试页面...")
                             delay(3000) // 等待3秒
-                            toast("开始提取ADB信息...")
-
+                            
+                            var extractedIP: String? = null
+                            var extractedPort: Int? = null
+                            
                             try {
-                                Log.i("AdbExtract", "===== 开始ADB信息提取 =====")
-                                LogUtils.i("AdbExtract", "===== 开始ADB信息提取 =====")
+                                Log.i("AdbExtract", "===== 开始ADB信息提取（带重试机制）=====")
+                                LogUtils.i("AdbExtract", "===== 开始ADB信息提取（带重试机制）=====")
                                 
                                 val a11yService = A11yService.instance
                                 if (a11yService == null) {
-                                    toast("❌ 无障碍服务不可用")
+                                    toast("❌ 操作完成：无障碍服务不可用")
                                     Log.e("AdbExtract", "无障碍服务不可用")
                                     LogUtils.e("AdbExtract", "无障碍服务不可用")
                                     return@launchTry
                                 }
-                                Log.i("AdbExtract", "✅ 无障碍服务可用")
-                                LogUtils.i("AdbExtract", "✅ 无障碍服务可用")
-
-                                // 尝试多次获取窗口，确保获取到正确的页面
-                                var root: AccessibilityNodeInfo? = null
-                                var retryCount = 0
-                                while (root == null && retryCount < 5) {
-                                    root = a11yService.safeActiveWindow
-                                    if (root == null) {
-                                        retryCount++
-                                        Log.w("AdbExtract", "无法获取当前窗口，重试 $retryCount/5")
-                                        delay(500)
+                                
+                                // 重试提取，最多尝试5次
+                                val maxRetries = 5
+                                var retryAttempt = 0
+                                
+                                while (retryAttempt < maxRetries && extractedIP == null) {
+                                    retryAttempt++
+                                    Log.i("AdbExtract", "=== 提取尝试 $retryAttempt/$maxRetries ===")
+                                    LogUtils.i("AdbExtract", "=== 提取尝试 $retryAttempt/$maxRetries ===")
+                                    
+                                    // 每次尝试前等待，给页面加载时间
+                                    if (retryAttempt > 1) {
+                                        toast("等待页面加载... (尝试 $retryAttempt/$maxRetries)")
+                                        delay(2000) // 每次重试前等待2秒
                                     }
-                                }
-                                
-                                if (root == null) {
-                                    toast("❌ 无法获取当前窗口，请确保已在无线调试页面")
-                                    Log.e("AdbExtract", "无法获取当前窗口")
-                                    LogUtils.e("AdbExtract", "无法获取当前窗口")
-                                    return@launchTry
-                                }
-                                
-                                Log.i("AdbExtract", "✅ 成功获取当前窗口，包名: ${root.packageName}")
-                                LogUtils.i("AdbExtract", "✅ 成功获取当前窗口，包名: ${root.packageName}")
-                                
-                                // 验证是否在设置页面
-                                if (root.packageName != "com.android.settings") {
-                                    toast("⚠️ 当前不在设置页面，包名: ${root.packageName}，请切换到无线调试页面")
-                                    Log.w("AdbExtract", "⚠️ 当前不在设置页面，包名: ${root.packageName}")
-                                    LogUtils.w("AdbExtract", "⚠️ 当前不在设置页面，包名: ${root.packageName}")
-                                }
-
-                                // 使用改进的文本提取方法
-                                val allText = getAllTextFromPage(root)
-                                
-                                // 验证页面是否包含无线调试相关内容
-                                if (!allText.contains("无线调试") && !allText.contains("IP") && !allText.contains("端口")) {
-                                    toast("⚠️ 页面可能不是无线调试页面，请确保已在无线调试页面")
-                                    Log.w("AdbExtract", "⚠️ 页面可能不是无线调试页面，提取的文本: ${allText.take(200)}")
-                                    LogUtils.w("AdbExtract", "⚠️ 页面可能不是无线调试页面，提取的文本: ${allText.take(200)}")
-                                }
-                                Log.i("AdbExtract", "页面文本提取完成，长度: ${allText.length}")
-                                LogUtils.i("AdbExtract", "页面文本提取完成，长度: ${allText.length}")
-
-                                // 方法1：标准的IP:端口格式匹配（支持多种分隔符）
-                                Log.i("AdbExtract", "开始方法1：标准IP:端口格式匹配...")
-                                LogUtils.i("AdbExtract", "开始方法1：标准IP:端口格式匹配...")
-                                val ipPortPatterns = listOf(
-                                    Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{4,5})"""),  // 标准格式
-                                    Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*[：:]\s*(\d{4,5})"""),  // 支持中文冒号
-                                    Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+(\d{4,5})"""),  // 空格分隔
-                                )
-                                
-                                var matchFound = false
-                                for ((index, pattern) in ipPortPatterns.withIndex()) {
-                                    Log.d("AdbExtract", "尝试模式 ${index + 1}/${ipPortPatterns.size}")
-                                    LogUtils.d("AdbExtract", "尝试模式 ${index + 1}/${ipPortPatterns.size}")
-                                    val match = pattern.find(allText)
-                                    if (match != null) {
-                                        val ip = match.groupValues[1]
-                                        val port = match.groupValues[2].toInt()
-                                        Log.d("AdbExtract", "模式 ${index + 1} 匹配到: $ip:$port")
-                                        LogUtils.d("AdbExtract", "模式 ${index + 1} 匹配到: $ip:$port")
-                                        
-                                        // 验证IP和端口有效性
-                                        if (isValidIp(ip) && port in 1024..65535) {
-                                            toast("✅ 提取成功: $ip:$port")
-                                            Log.i("AdbExtract", "✅✅✅ ADB信息提取成功: $ip:$port")
-                                            LogUtils.i("AdbExtract", "✅✅✅ ADB信息提取成功: $ip:$port")
-                                            matchFound = true
-                                            break
-                                        } else {
-                                            Log.w("AdbExtract", "模式 ${index + 1} 匹配的IP或端口无效: $ip:$port")
-                                            LogUtils.w("AdbExtract", "模式 ${index + 1} 匹配的IP或端口无效: $ip:$port")
+                                    
+                                    // 尝试多次获取窗口
+                                    var root: AccessibilityNodeInfo? = null
+                                    var windowRetryCount = 0
+                                    while (root == null && windowRetryCount < 5) {
+                                        root = a11yService.safeActiveWindow
+                                        if (root == null) {
+                                            windowRetryCount++
+                                            delay(500)
                                         }
-                                    } else {
-                                        Log.d("AdbExtract", "模式 ${index + 1} 未匹配")
-                                        LogUtils.d("AdbExtract", "模式 ${index + 1} 未匹配")
+                                    }
+                                    
+                                    if (root == null) {
+                                        Log.w("AdbExtract", "尝试 $retryAttempt: 无法获取当前窗口")
+                                        LogUtils.w("AdbExtract", "尝试 $retryAttempt: 无法获取当前窗口")
+                                        continue
+                                    }
+                                    
+                                    // 使用改进的文本提取方法
+                                    val allText = getAllTextFromPage(root)
+                                    Log.i("AdbExtract", "尝试 $retryAttempt: 页面文本提取完成，长度: ${allText.length}")
+                                    LogUtils.i("AdbExtract", "尝试 $retryAttempt: 页面文本提取完成，长度: ${allText.length}")
+
+                                    // 方法1：标准的IP:端口格式匹配
+                                    val ipPortPatterns = listOf(
+                                        Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{4,5})"""),
+                                        Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*[：:]\s*(\d{4,5})"""),
+                                        Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+(\d{4,5})"""),
+                                    )
+                                    
+                                    var matchFound = false
+                                    for ((index, pattern) in ipPortPatterns.withIndex()) {
+                                        val match = pattern.find(allText)
+                                        if (match != null) {
+                                            val ip = match.groupValues[1]
+                                            val port = match.groupValues[2].toInt()
+                                            
+                                            if (isValidIp(ip) && port in 1024..65535) {
+                                                extractedIP = ip
+                                                extractedPort = port
+                                                matchFound = true
+                                                Log.i("AdbExtract", "✅✅✅ 尝试 $retryAttempt 提取成功: $ip:$port")
+                                                LogUtils.i("AdbExtract", "✅✅✅ 尝试 $retryAttempt 提取成功: $ip:$port")
+                                                break
+                                            }
+                                        }
+                                    }
+
+                                    if (!matchFound) {
+                                        // 方法2：分离IP和端口匹配
+                                        val ipPattern = Regex("""\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b""")
+                                        val portPattern = Regex("""\b(\d{4,5})\b""")
+
+                                        val allIPs = ipPattern.findAll(allText).map { it.groupValues[1] }.toList()
+                                        val allPorts = portPattern.findAll(allText).map { it.groupValues[1].toInt() }.toList()
+
+                                        val foundIPs = allIPs.filter { isValidIp(it) }
+                                        val foundPorts = allPorts.filter { it in 1024..65535 }
+
+                                        if (foundIPs.isNotEmpty() && foundPorts.isNotEmpty()) {
+                                            extractedIP = foundIPs.first()
+                                            extractedPort = foundPorts.first()
+                                            Log.i("AdbExtract", "✅✅✅ 尝试 $retryAttempt 通过分离匹配提取成功: ${extractedIP}:${extractedPort}")
+                                            LogUtils.i("AdbExtract", "✅✅✅ 尝试 $retryAttempt 通过分离匹配提取成功: ${extractedIP}:${extractedPort}")
+                                        } else {
+                                            Log.w("AdbExtract", "尝试 $retryAttempt: 未找到有效的IP或端口")
+                                            LogUtils.w("AdbExtract", "尝试 $retryAttempt: 未找到有效的IP或端口")
+                                        }
                                     }
                                 }
-
-                                if (!matchFound) {
-                                    Log.w("AdbExtract", "方法1失败，开始方法2：分离IP和端口匹配...")
-                                    LogUtils.w("AdbExtract", "方法1失败，开始方法2：分离IP和端口匹配...")
-                                    
-                                    // 方法2：分离IP和端口匹配
-                                    val ipPattern = Regex("""\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b""")
-                                    val portPattern = Regex("""\b(\d{4,5})\b""")
-
-                                    val allIPs = ipPattern.findAll(allText).map { it.groupValues[1] }.toList()
-                                    val allPorts = portPattern.findAll(allText).map { it.groupValues[1].toInt() }.toList()
-                                    
-                                    Log.d("AdbExtract", "找到所有IP候选: $allIPs")
-                                    Log.d("AdbExtract", "找到所有端口候选: $allPorts")
-                                    LogUtils.d("AdbExtract", "找到所有IP候选: $allIPs")
-                                    LogUtils.d("AdbExtract", "找到所有端口候选: $allPorts")
-
-                                    val foundIPs = allIPs.filter { isValidIp(it) }
-                                    val foundPorts = allPorts.filter { it in 1024..65535 }
-
-                                    Log.i("AdbExtract", "验证后IP列表: $foundIPs")
-                                    Log.i("AdbExtract", "验证后端口列表: $foundPorts")
-                                    LogUtils.i("AdbExtract", "验证后IP列表: $foundIPs")
-                                    LogUtils.i("AdbExtract", "验证后端口列表: $foundPorts")
-
-                                    if (foundIPs.isNotEmpty() && foundPorts.isNotEmpty()) {
-                                        val ip = foundIPs.first()
-                                        val port = foundPorts.first()
-                                        toast("✅ 提取成功: $ip:$port")
-                                        Log.i("AdbExtract", "✅✅✅ 通过分离匹配提取成功: $ip:$port")
-                                        LogUtils.i("AdbExtract", "✅✅✅ 通过分离匹配提取成功: $ip:$port")
-                                    } else if (foundIPs.isNotEmpty() || foundPorts.isNotEmpty()) {
-                                        toast("🔍 找到IP: ${foundIPs.joinToString()} 端口: ${foundPorts.joinToString()}")
-                                        Log.w("AdbExtract", "找到分离的IP: $foundIPs, 端口: $foundPorts，但无法配对")
-                                        LogUtils.w("AdbExtract", "找到分离的IP: $foundIPs, 端口: $foundPorts，但无法配对")
-                                    } else {
-                                        toast("❌ 未找到IP或端口")
-                                        Log.e("AdbExtract", "❌ 未找到有效的IP或端口")
-                                        Log.e("AdbExtract", "页面文本前1000字符: ${allText.take(1000)}")
-                                        Log.e("AdbExtract", "页面文本后1000字符: ${allText.takeLast(1000)}")
-                                        LogUtils.e("AdbExtract", "❌ 未找到有效的IP或端口")
-                                        LogUtils.e("AdbExtract", "页面文本前1000字符: ${allText.take(1000)}")
-                                        LogUtils.e("AdbExtract", "页面文本后1000字符: ${allText.takeLast(1000)}")
-                                    }
+                                
+                                // 显示最终结果
+                                if (extractedIP != null && extractedPort != null) {
+                                    toast("✅ 操作完成：提取成功\nIP: $extractedIP\n端口: $extractedPort\n连接: $extractedIP:$extractedPort")
+                                    Log.i("AdbExtract", "✅✅✅ 最终提取成功: $extractedIP:$extractedPort")
+                                    LogUtils.i("AdbExtract", "✅✅✅ 最终提取成功: $extractedIP:$extractedPort")
+                                } else {
+                                    toast("❌ 操作完成：提取失败\n已尝试 $maxRetries 次，未找到有效的IP和端口\n请确保：\n1. 已在无线调试页面\n2. 无线调试已启用\n3. IP和端口已显示")
+                                    Log.e("AdbExtract", "❌ 最终提取失败，已尝试 $maxRetries 次")
+                                    LogUtils.e("AdbExtract", "❌ 最终提取失败，已尝试 $maxRetries 次")
                                 }
                                 
                                 Log.i("AdbExtract", "===== ADB信息提取结束 =====")
@@ -806,7 +780,7 @@ fun AdvancedPage() {
 
                             } catch (e: Exception) {
                                 val errorMsg = e.message ?: e.javaClass.simpleName
-                                toast("❌ 提取失败: $errorMsg")
+                                toast("❌ 操作完成：提取失败\n错误: $errorMsg")
                                 Log.e("AdbExtract", "ADB信息提取失败: $errorMsg", e)
                                 LogUtils.e("AdbExtract", "ADB信息提取失败: $errorMsg", e)
                             }
@@ -814,7 +788,7 @@ fun AdvancedPage() {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("7. ADB信息提取 ⏰ (详细日志版)")
+                    Text("7. ADB信息提取 ⏰ (重试版)")
                 }
             }
             

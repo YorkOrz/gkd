@@ -139,3 +139,36 @@ val recordNotif = Notif(
     uri = "gkd://page/1",
     stopService = RecordService::class,
 )
+
+/**
+ * 显示ADB提取结果通知
+ */
+fun showAdbExtractNotification(success: Boolean, ip: String? = null, port: Int? = null, errorMsg: String? = null) {
+    val title = if (success) "✅ ADB信息提取成功" else "❌ ADB信息提取失败"
+    val text = if (success && ip != null && port != null) {
+        "IP: $ip\n端口: $port\n连接: $ip:$port"
+    } else if (errorMsg != null) {
+        errorMsg
+    } else {
+        "未找到有效的IP和端口"
+    }
+    
+    // 使用NotificationCompat.Builder直接构建，确保通知能显示
+    try {
+        val notification = NotificationCompat.Builder(app, NotifChannel.Default.id)
+            .setSmallIcon(SafeR.ic_status)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_HIGH) // 高优先级确保显示
+            .setAutoCancel(true)
+            .setOngoing(false)
+            .build()
+        
+        @SuppressLint("MissingPermission")
+        NotificationManagerCompat.from(app).notify(200, notification)
+    } catch (e: Exception) {
+        // 如果通知失败，至少记录日志
+        android.util.Log.e("AdbExtract", "发送通知失败: ${e.message}", e)
+    }
+}
